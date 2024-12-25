@@ -1,7 +1,7 @@
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton
 from aiogram.utils import executor
 import datetime
 from settings import TOKEN, CATEGORIES
@@ -101,15 +101,21 @@ async def handle_category(message: types.Message):
             f"Year/Month: {data['year_month']}\n"
             "Confirm? (Yes/No)"
         )
-        await message.reply(confirmation_text, reply_markup=ReplyKeyboardRemove())
+
+        # Create regular keyboard with Yes and No buttons
+        confirmation_keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+        yes_button = KeyboardButton("Yes")
+        no_button = KeyboardButton("No")
+        confirmation_keyboard.add(yes_button, no_button)
+
+        await message.reply(confirmation_text, reply_markup=confirmation_keyboard)
     else:
         await message.reply("Invalid category. Please choose a valid category.")
 
-
 # Confirmation handler
-@dp.message_handler(lambda message: user_data.get(message.from_user.id, {}).get('step') == 'confirmation' and message.text.lower() in ['yes', 'no'])
+@dp.message_handler(lambda message: user_data.get(message.from_user.id, {}).get('step') == 'confirmation' and message.text in ['Yes', 'No'])
 async def handle_confirmation(message: types.Message):
-    if message.text.lower() == 'yes':
+    if message.text == 'Yes':
         # Append data to Google Sheet
         data = user_data[message.from_user.id]
         username = message.from_user.username if message.from_user.username else "No username"  # Handle case if the user has no username
@@ -130,7 +136,6 @@ async def handle_confirmation(message: types.Message):
 
     # Reset the user data
     user_data[message.from_user.id] = {'step': 'payment_type'}
-
 
 # Handler to show the last 3 entries from Google Sheet
 @dp.message_handler(lambda message: message.text == "Show Last 3 Entries 📜")
