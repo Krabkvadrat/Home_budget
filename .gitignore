@@ -156,6 +156,7 @@ cython_debug/
 
 # stuff
 gdrive_creds.json
+credentials.py
 
 
 # PyCharm
