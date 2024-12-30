@@ -1,4 +1,6 @@
 import gspread
+import io
+import matplotlib.pyplot as plt
 from oauth2client.service_account import ServiceAccountCredentials
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton
@@ -23,7 +25,7 @@ user_data = {}
 # Buttons for payment type
 keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
 keyboard.add(KeyboardButton("CASH 💵"), KeyboardButton("CARD 💳"))
-keyboard.add(KeyboardButton("Show Last 3 Entries 📜"))
+keyboard.add(KeyboardButton("Show Last 3 Entries 📜"), KeyboardButton("Show analytics 📊"))
 keyboard.add(KeyboardButton("Delete last row 🗑️"))
 
 # Start command handler
@@ -174,6 +176,49 @@ async def handle_delete_confirmation(message: types.Message):
             await message.reply("Could not find the last row to delete.", reply_markup=keyboard)
     else:
         await message.reply("Deletion canceled.", reply_markup=keyboard)
+
+@dp.message_handler(lambda message: message.text == "Show analytics 📊")
+async def show_analytics(message: types.Message):
+    # Get all rows from the sheet
+    data = sheet.get_all_values()
+    df = pd.DataFrame(data[1:], columns=data[0])  # Skip the header row
+
+    # Parse the "Дата" column to datetime and filter the last 2 months
+    df['Дата'] = pd.to_datetime(df['Дата'], format='%d.%m', errors='coerce')
+    df = df.dropna(subset=['Дата'])  # Remove rows with invalid dates
+    df['Дата'] = df['Дата'].apply(lambda x: x.replace(year=datetime.datetime.now().year))
+    two_months_ago = datetime.datetime.now() - pd.DateOffset(months=2)
+    filtered_df = df[df['Дата'] >= two_months_ago]
+
+    # Group by "Категория" and calculate the total for each
+    grouped = filtered_df.groupby('Категория')['Сумма'].sum().reset_index()
+
+    # Create a table image
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.axis('tight')
+    ax.axis('off')
+
+    # Format the table as a matplotlib table
+    table = ax.table(
+        cellText=grouped.values,
+        colLabels=grouped.columns,
+        cellLoc='center',
+        loc='center'
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.auto_set_column_width(col=list(range(len(grouped.columns))))
+
+    # Save the table as an image
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png', bbox_inches='tight')
+    buffer.seek(0)
+    plt.close()
+
+    # Send the table image to the user
+    await bot.send_photo(chat_id=message.chat.id, photo=buffer)
+    buffer.close()
+
 
 # Run bot
 if __name__ == "__main__":
