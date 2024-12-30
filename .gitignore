@@ -155,7 +155,6 @@ dmypy.json
 cython_debug/
 
 # stuff
-settings.py
 gdrive_creds.json
 
 
