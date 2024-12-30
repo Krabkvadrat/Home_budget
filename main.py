@@ -1,5 +1,6 @@
 import gspread
 import io
+import pandas as pd
 import matplotlib.pyplot as plt
 from oauth2client.service_account import ServiceAccountCredentials
 from aiogram import Bot, Dispatcher, types
@@ -183,15 +184,18 @@ async def show_analytics(message: types.Message):
     data = sheet.get_all_values()
     df = pd.DataFrame(data[1:], columns=data[0])  # Skip the header row
 
+    # Print the column names for debugging
+    print("Columns in DataFrame:", df.columns)
+
     # Parse the "Дата" column to datetime and filter the last 2 months
-    df['Дата'] = pd.to_datetime(df['Дата'], format='%d.%m', errors='coerce')
-    df = df.dropna(subset=['Дата'])  # Remove rows with invalid dates
-    df['Дата'] = df['Дата'].apply(lambda x: x.replace(year=datetime.datetime.now().year))
+    df['date'] = pd.to_datetime(df['date'], format='%d.%m', errors='coerce')
+    df = df.dropna(subset=['date'])  # Remove rows with invalid dates
+    df['date'] = df['date'].apply(lambda x: x.replace(year=datetime.datetime.now().year))
     two_months_ago = datetime.datetime.now() - pd.DateOffset(months=2)
-    filtered_df = df[df['Дата'] >= two_months_ago]
+    filtered_df = df[df['date'] >= two_months_ago]
 
     # Group by "Категория" and calculate the total for each
-    grouped = filtered_df.groupby('Категория')['Сумма'].sum().reset_index()
+    grouped = filtered_df.groupby('category')['value'].sum().reset_index()
 
     # Create a table image
     fig, ax = plt.subplots(figsize=(8, 4))
