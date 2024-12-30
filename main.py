@@ -1,10 +1,15 @@
 import gspread
+import traceback
+import io
+import pandas as pd
+import matplotlib.pyplot as plt
 from oauth2client.service_account import ServiceAccountCredentials
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from aiogram.utils import executor
 import datetime
-from settings import TOKEN, CATEGORIES
+from settings import CATEGORIES
+from credentials import TOKEN
 
 # Google Sheets setup
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -16,14 +21,13 @@ sheet = client.open("Budva expenses for bot").sheet1  # Open the sheet you want 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
 
-
 # State to store user data temporarily
 user_data = {}
 
 # Buttons for payment type
 keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
 keyboard.add(KeyboardButton("CASH 💵"), KeyboardButton("CARD 💳"))
-keyboard.add(KeyboardButton("Show Last 3 Entries 📜"))
+keyboard.add(KeyboardButton("Show Last 3 Entries 📜"), KeyboardButton("Show analytics 📊"))
 keyboard.add(KeyboardButton("Delete last row 🗑️"))
 
 # Start command handler
@@ -35,11 +39,21 @@ async def start(message: types.Message):
 # Payment type handler
 @dp.message_handler(lambda message: message.text in ["CASH 💵", "CARD 💳"])
 async def handle_payment_type(message: types.Message):
-    user_data[message.from_user.id]['payment_type'] = message.text.split()[0]
-    user_data[message.from_user.id]['date'] = datetime.datetime.now().strftime("%Y-%m-%d")
-    user_data[message.from_user.id]['year_month'] = datetime.datetime.now().strftime("%Y-%m")
-    user_data[message.from_user.id]['step'] = 'value'  # Move to the next step
-    await message.reply("Enter the value (amount):")
+    try:
+        user_data[message.from_user.id]['payment_type'] = message.text.split()[0]
+        user_data[message.from_user.id]['date'] = datetime.datetime.now().strftime("%Y-%m-%d")
+        user_data[message.from_user.id]['year_month'] = datetime.datetime.now().strftime("%Y-%m")
+        user_data[message.from_user.id]['step'] = 'value'  # Move to the next step
+        await message.reply("Enter the value (amount):")
+    #
+    except KeyError as e:
+        await message.reply(f"Don't forget to use /start command")
+        traceback.print_exc()
+
+    except Exception as e:
+        print(e)
+        await message.reply(f'Error processing payment method: {e}')
+        traceback.print_exc()
 
 
 # Value handler
@@ -83,7 +97,6 @@ async def handle_description(message: types.Message):
 @dp.message_handler(lambda message: user_data.get(message.from_user.id, {}).get('step') == 'category')
 async def handle_category(message: types.Message):
     # Debugging: print user's input and expected categories
-    #print(f"User input: {message.text}, Available categories: {CATEGORIES}")
 
     # Check if the chosen category is valid
     if message.text in (category for category in CATEGORIES):
@@ -174,6 +187,63 @@ async def handle_delete_confirmation(message: types.Message):
             await message.reply("Could not find the last row to delete.", reply_markup=keyboard)
     else:
         await message.reply("Deletion canceled.", reply_markup=keyboard)
+
+@dp.message_handler(lambda message: message.text == "Show analytics 📊")
+async def show_analytics(message: types.Message):
+    # Get all rows from the sheet
+    data = sheet.get_all_values()
+    df = pd.DataFrame(data[1:], columns=data[0])  # Skip the header row
+
+    # Parse the "Дата" column to datetime and filter the last 2 months
+    df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce')
+    df['value'] = pd.to_numeric(df['value'], errors='coerce')
+    # Get the current date
+    current_date = datetime.datetime.now()
+    # Get the date two months ago
+    two_months_ago = current_date - pd.DateOffset(months=1)
+    # Convert to pandas Timestamp and truncate to the start of the month
+    two_months_ago = pd.Timestamp(two_months_ago).to_period('M').to_timestamp()
+    filtered_df = df[df['date'] >= two_months_ago]
+
+    # Group by "category" and calculate the total for each
+    grouped = filtered_df.groupby(['year_month', 'category'], as_index=False)['value'].sum()
+    grouped = grouped.sort_values(['year_month', 'value'], ascending=False)
+    # Create a figure with two subplots side by side
+    fig, axs = plt.subplots(1, 2, figsize=(10, 4))
+
+    # Get the unique months
+    unique_months = grouped['year_month'].unique()
+
+    # Create a table for each month
+    for i, month in enumerate(unique_months):
+        month_data = grouped[grouped['year_month'] == month]
+        total_value = month_data['value'].sum()
+        month_data['percentage'] = round((month_data['value'] / total_value) * 100, 2)
+        total_row = pd.DataFrame([['Total', '', total_value, 100]], columns=month_data.columns)
+        month_data = pd.concat([month_data, total_row], ignore_index=True)
+
+        axs[i].axis('tight')
+        axs[i].axis('off')
+        table = axs[i].table(
+            cellText=month_data.values,
+            colLabels=month_data.columns,
+            cellLoc='center',
+            loc='center'
+        )
+        table.auto_set_font_size(False)
+        table.set_fontsize(10)
+        table.auto_set_column_width(col=list(range(len(month_data.columns))))
+
+    # Save the table as an image
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png', bbox_inches='tight')
+    buffer.seek(0)
+    plt.close()
+
+    # Send the table image to the user
+    await bot.send_photo(chat_id=message.chat.id, photo=buffer)
+    buffer.close()
+
 
 # Run bot
 if __name__ == "__main__":
