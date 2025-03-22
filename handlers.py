@@ -236,43 +236,54 @@ class Handlers:
                 await message.reply("No data available for the last two months.", reply_markup=create_main_keyboard())
                 return
 
-            grouped = filtered_df.groupby(['year_month', 'category'], as_index=False)['value'].sum()
-            grouped = grouped.sort_values(['year_month', 'value'], ascending=False)
+            # Create separate analytics for each currency
+            for currency in ['RUB', 'RSD']:
+                currency_df = filtered_df[filtered_df['payment_type'] == currency]
+                if currency_df.empty:
+                    continue
 
-            fig, axs = plt.subplots(1, 2, figsize=(12, 6))
-            unique_months = grouped['year_month'].unique()
+                grouped = currency_df.groupby(['year_month', 'category'], as_index=False)['value'].sum()
+                grouped = grouped.sort_values(['year_month', 'value'], ascending=False)
 
-            for i, month in enumerate(unique_months):
-                month_data = grouped[grouped['year_month'] == month]
-                total_value = month_data['value'].sum()
-                month_data['percentage'] = round((month_data['value'] / total_value) * 100, 2)
-                total_row = pd.DataFrame([['Total', '', total_value, 100]], columns=month_data.columns)
-                month_data = pd.concat([month_data, total_row], ignore_index=True)
+                # Create figure with subplots for each month
+                unique_months = grouped['year_month'].unique()
+                fig, axs = plt.subplots(1, len(unique_months), figsize=(6*len(unique_months), 6))
+                if len(unique_months) == 1:
+                    axs = [axs]  # Make axs iterable if there's only one month
 
-                axs[i].axis('tight')
-                axs[i].axis('off')
-                table = axs[i].table(
-                    cellText=month_data.values,
-                    colLabels=month_data.columns,
-                    cellLoc='center',
-                    loc='center'
+                for i, month in enumerate(unique_months):
+                    month_data = grouped[grouped['year_month'] == month]
+                    total_value = month_data['value'].sum()
+                    month_data['percentage'] = round((month_data['value'] / total_value) * 100, 2)
+                    total_row = pd.DataFrame([['Total', '', total_value, 100]], columns=month_data.columns)
+                    month_data = pd.concat([month_data, total_row], ignore_index=True)
+
+                    axs[i].axis('tight')
+                    axs[i].axis('off')
+                    table = axs[i].table(
+                        cellText=month_data.values,
+                        colLabels=month_data.columns,
+                        cellLoc='center',
+                        loc='center'
+                    )
+                    table.auto_set_font_size(False)
+                    table.set_fontsize(9)
+                    table.auto_set_column_width(col=list(range(len(month_data.columns))))
+
+                plt.suptitle(f'📊 Analytics for {currency} - Last Two Months', fontsize=14)
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', bbox_inches='tight', dpi=300)
+                buffer.seek(0)
+                plt.close()
+
+                await self.bot.send_photo(
+                    chat_id=message.chat.id,
+                    photo=buffer,
+                    caption=f"📊 Analytics for {currency} - Last Two Months"
                 )
-                table.auto_set_font_size(False)
-                table.set_fontsize(9)
-                table.auto_set_column_width(col=list(range(len(month_data.columns))))
-
-            buffer = io.BytesIO()
-            plt.savefig(buffer, format='png', bbox_inches='tight', dpi=300)
-            buffer.seek(0)
-            plt.close()
+                buffer.close()
 
             logger.info(f"User {message.from_user.id} requested analytics")
-            await self.bot.send_photo(
-                chat_id=message.chat.id,
-                photo=buffer,
-                caption="📊 Analytics for the last two months"
-            )
-            buffer.close()
         except Exception as e:
             logger.error(f"Error generating analytics: {str(e)}")
             await message.reply("❌ Failed to generate analytics. Please try again later.", reply_markup=create_main_keyboard())
