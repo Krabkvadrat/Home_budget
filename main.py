@@ -26,7 +26,7 @@ user_data = {}
 
 # Buttons for payment type
 keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-keyboard.add(KeyboardButton("CASH 💵"), KeyboardButton("CARD 💳"))
+keyboard.add(KeyboardButton("RUB 🇷🇺"), KeyboardButton("RSD 🇷🇸"))
 keyboard.add(KeyboardButton("Show Last 3 Entries 📜"), KeyboardButton("Show analytics 📊"))
 keyboard.add(KeyboardButton("Delete last row 🗑️"))
 
@@ -37,7 +37,7 @@ async def start(message: types.Message):
     await message.reply("Hello, let's start!", reply_markup=keyboard)
 
 # Payment type handler
-@dp.message_handler(lambda message: message.text in ["CASH 💵", "CARD 💳"])
+@dp.message_handler(lambda message: message.text in ["RUB 🇷🇺", "RSD 🇷🇸"])
 async def handle_payment_type(message: types.Message):
     try:
         user_data[message.from_user.id]['payment_type'] = message.text.split()[0]
