@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from aiogram import types
 from aiogram.types import ReplyKeyboardRemove
-from settings import CATEGORIES
+from settings import CATEGORIES, AUTHORIZED_USERS
 from utils import (
     validate_value, validate_description, ValidationError,
     create_main_keyboard, create_category_keyboard, create_confirmation_keyboard,
@@ -21,6 +21,18 @@ class Handlers:
         self.db = db
         self.user_data = {}
         self._register_handlers()
+
+    def _is_authorized(self, user_id: int) -> bool:
+        """Check if user is authorized to use the bot."""
+        return user_id in AUTHORIZED_USERS
+
+    async def _handle_unauthorized(self, message: types.Message):
+        """Handle unauthorized access attempts."""
+        logger.warning(f"Unauthorized access attempt from user {message.from_user.id}")
+        await message.reply(
+            "⛔️ Sorry, you are not authorized to use this bot.\n"
+            "Please contact the administrator for access."
+        )
 
     def _register_handlers(self):
         """Register all message handlers."""
@@ -45,8 +57,12 @@ class Handlers:
     async def start(self, message: types.Message):
         """Handle /start command."""
         try:
+            if not self._is_authorized(message.from_user.id):
+                await self._handle_unauthorized(message)
+                return
+
             self.user_data[message.from_user.id] = {'step': 'payment_type'}
-            logger.info(f"User {message.from_user.id} started the bot")
+            logger.info(f"Authorized user {message.from_user.id} started the bot")
             await message.reply("Hello, let's start!", reply_markup=create_main_keyboard())
         except Exception as e:
             logger.error(f"Error in start handler: {str(e)}")
@@ -55,11 +71,15 @@ class Handlers:
     async def handle_payment_type(self, message: types.Message):
         """Handle payment type selection."""
         try:
+            if not self._is_authorized(message.from_user.id):
+                await self._handle_unauthorized(message)
+                return
+
             self.user_data[message.from_user.id]['payment_type'] = message.text.split()[0]
             self.user_data[message.from_user.id]['date'] = datetime.datetime.now().strftime("%Y-%m-%d")
             self.user_data[message.from_user.id]['year_month'] = datetime.datetime.now().strftime("%Y-%m")
             self.user_data[message.from_user.id]['step'] = 'value'
-            logger.info(f"User {message.from_user.id} selected payment type: {message.text}")
+            logger.info(f"Authorized user {message.from_user.id} selected payment type: {message.text}")
             await message.reply("Enter the value (amount):")
         except KeyError:
             logger.warning(f"User {message.from_user.id} tried to use payment type without starting the bot")
@@ -218,6 +238,10 @@ class Handlers:
     async def show_analytics(self, message: types.Message):
         """Show expense analytics."""
         try:
+            if not self._is_authorized(message.from_user.id):
+                await self._handle_unauthorized(message)
+                return
+
             data = self.db.get_all_rows()
             if len(data) <= 1:  # Only header row
                 await message.reply("No data available for analytics.", reply_markup=create_main_keyboard())
@@ -290,6 +314,10 @@ class Handlers:
 
     async def help_command(self, message: types.Message):
         """Show help message."""
+        if not self._is_authorized(message.from_user.id):
+            await self._handle_unauthorized(message)
+            return
+
         help_text = (
             "🤖 *Budget Bot Help*\n\n"
             "Available commands:\n"
@@ -303,4 +331,4 @@ class Handlers:
             "• Delete last entry\n\n"
             "Need more help? Contact the administrator."
         )
-        await message.reply(help_text, parse_mode='Markdown', reply_markup=create_main_keyboard()) 
+        await message.reply(help_text, parse_mode='Markdown', reply_markup=create_main_keyboard())
