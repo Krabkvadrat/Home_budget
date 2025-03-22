@@ -258,7 +258,7 @@ async def delete_last_row_confirm(message: types.Message):
             return
 
         last_row = all_rows[-1]
-        last_row_text = "\n".join(
+        last_row_text = (
             f"📅 Date: {last_row[0]}\n"
             f"💰 Value: {last_row[1]}\n"
             f"📝 Description: {last_row[2]}\n"
