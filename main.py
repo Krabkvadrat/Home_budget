@@ -1,4 +1,5 @@
 import logging
+import os
 from aiogram import Bot, Dispatcher
 from aiogram.utils import executor
 from credentials import TOKEN
@@ -6,11 +7,14 @@ from database import init_database
 from handlers import Handlers
 
 # Configure logging
+LOG_DIR = "/app/logs"  # Docker-friendly path
+os.makedirs(LOG_DIR, exist_ok=True)  # Create logs directory if it doesn't exist
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('bot.log'),
+        logging.FileHandler(os.path.join(LOG_DIR, 'bot.log')),
         logging.StreamHandler()
     ]
 )

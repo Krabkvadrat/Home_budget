@@ -10,6 +10,9 @@ COPY requirements.txt .
 # Install the dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Create logs directory
+RUN mkdir -p /app/logs && chmod 777 /app/logs
+
 # Copy the bot's code into the container
 COPY . .
 
