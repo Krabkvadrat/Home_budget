@@ -8,5 +8,6 @@ CATEGORIES = [
 
 # List of authorized user IDs (Telegram user IDs)
 AUTHORIZED_USERS = [
-    325222201
+    325222201,
+    2118030226
 ]
