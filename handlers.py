@@ -9,7 +9,7 @@ from settings import CATEGORIES, AUTHORIZED_USERS
 from utils import (
     validate_value, validate_description, ValidationError,
     create_main_keyboard, create_category_keyboard, create_confirmation_keyboard,
-    format_expense_entry
+    format_expense_entry, create_analytics_keyboard
 )
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,9 @@ class Handlers:
             self.handle_delete_confirmation,
             lambda m: self.user_data.get(m.from_user.id, {}).get('step') == 'delete_confirmation'
         )
-        self.dp.register_message_handler(self.show_analytics, lambda m: m.text == "Show analytics 📊")
+        self.dp.register_message_handler(self.analytics_button, lambda m: m.text == "Show analytics 📊")
+        self.dp.register_message_handler(self.back_button, lambda m: m.text == "Back 🔙")
+        self.dp.register_message_handler(self.show_analytics_two_months, lambda m: m.text == "Two months 📅")
         self.dp.register_message_handler(self.help_command, commands=['help'])
 
     async def start(self, message: types.Message):
@@ -66,6 +68,22 @@ class Handlers:
             await message.reply("Hello, let's start!", reply_markup=create_main_keyboard())
         except Exception as e:
             logger.error(f"Error in start handler: {str(e)}")
+            await message.reply("Sorry, something went wrong. Please try again later.")
+
+    async def analytics_button(self, message: types.Message):
+        try:
+            await message.reply(f"Available analytics:", reply_markup=create_analytics_keyboard())
+
+        except Exception as e:
+            logger.error(f"Error in analytics_button handler: {str(e)}")
+            await message.reply("Sorry, something went wrong. Please try again later.")
+
+    async def back_button(self, message: types.Message):
+        try:
+            await message.reply(f"Options:", reply_markup=create_main_keyboard())
+
+        except Exception as e:
+            logger.error(f"Error in back_button handler: {str(e)}")
             await message.reply("Sorry, something went wrong. Please try again later.")
 
     async def handle_payment_type(self, message: types.Message):
@@ -235,7 +253,7 @@ class Handlers:
         finally:
             self.user_data[message.from_user.id] = {'step': 'payment_type'}
 
-    async def show_analytics(self, message: types.Message):
+    async def show_analytics_two_months(self, message: types.Message):
         """Show expense analytics."""
         try:
             if not self._is_authorized(message.from_user.id):
@@ -252,9 +270,9 @@ class Handlers:
             df['value'] = pd.to_numeric(df['value'], errors='coerce')
             
             current_date = datetime.datetime.now()
-            two_months_ago = current_date - pd.DateOffset(months=1)
-            two_months_ago = pd.Timestamp(two_months_ago).to_period('M').to_timestamp()
-            filtered_df = df[df['date'] >= two_months_ago]
+            three_months_ago = current_date - pd.DateOffset(months=2)
+            three_months_ago = pd.Timestamp(three_months_ago).to_period('M').to_timestamp()
+            filtered_df = df[df['date'] >= three_months_ago]
 
             if filtered_df.empty:
                 await message.reply("No data available for the last two months.", reply_markup=create_main_keyboard())
@@ -269,30 +287,47 @@ class Handlers:
                 grouped = currency_df.groupby(['year_month', 'category'], as_index=False)['value'].sum()
                 grouped = grouped.sort_values(['year_month', 'value'], ascending=False)
 
+                # Calculate % change to previous month
+                pivot = grouped.pivot(index='category', columns='year_month', values='value')
+                pivot = pivot.sort_index(axis=1)
+                percent_change = pivot.pct_change(axis=1) * 100
+                percent_change_long = percent_change.reset_index().melt(
+                    id_vars='category', var_name='year_month', value_name='Δ, %'
+                )
+                grouped = grouped.merge(percent_change_long, on=['category', 'year_month'], how='left')
+                grouped['Δ, %'] = grouped['Δ, %'].round(1)
+
                 # Create figure with subplots for each month
                 unique_months = grouped['year_month'].unique()
-                fig, axs = plt.subplots(1, len(unique_months), figsize=(6*len(unique_months), 6))
+                fig, axs = plt.subplots(1, len(unique_months[:2]), figsize=(6 * len(unique_months[:2]), 6))
                 if len(unique_months) == 1:
                     axs = [axs]  # Make axs iterable if there's only one month
 
-                for i, month in enumerate(unique_months):
+                for i, month in enumerate(unique_months[:2]):
                     month_data = grouped[grouped['year_month'] == month]
                     total_value = month_data['value'].sum()
-                    month_data['percentage'] = round((month_data['value'] / total_value) * 100, 2)
-                    total_row = pd.DataFrame([['Total', '', total_value, 100]], columns=month_data.columns)
-                    month_data = pd.concat([month_data, total_row], ignore_index=True)
+                    month_data['percentage, %'] = ((month_data['value'] / total_value) * 100).round(1)
+
+                    # Add row for total
+                    total_row = pd.DataFrame([['Total', '', total_value, '', 100, '']],
+                                             columns=['year_month', 'category', 'value', 'Δ, %',
+                                                      'percentage, %', 'dummy'])
+                    month_data = pd.concat([month_data, total_row.drop(columns=['dummy'])], ignore_index=True)
+
+                    # Define display order
+                    display_columns = ['category', 'value', 'percentage, %', 'Δ, %']
 
                     axs[i].axis('tight')
                     axs[i].axis('off')
                     table = axs[i].table(
-                        cellText=month_data.values,
-                        colLabels=month_data.columns,
+                        cellText=month_data[display_columns].values,
+                        colLabels=display_columns,
                         cellLoc='center',
                         loc='center'
                     )
                     table.auto_set_font_size(False)
                     table.set_fontsize(9)
-                    table.auto_set_column_width(col=list(range(len(month_data.columns))))
+                    table.auto_set_column_width(col=list(range(len(display_columns))))
 
                 plt.suptitle(f'📊 Analytics for {currency} - Last Two Months', fontsize=14)
                 buffer = io.BytesIO()
