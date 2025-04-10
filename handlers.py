@@ -306,16 +306,16 @@ class Handlers:
                 for i, month in enumerate(unique_months[:2]):
                     month_data = grouped[grouped['year_month'] == month]
                     total_value = month_data['value'].sum()
-                    month_data['percentage, %'] = ((month_data['value'] / total_value) * 100).round(1)
+                    month_data['share, %'] = ((month_data['value'] / total_value) * 100).round(1)
 
                     # Add row for total
                     total_row = pd.DataFrame([['Total', '', total_value, '', 100, '']],
                                              columns=['year_month', 'category', 'value', 'Δ, %',
-                                                      'percentage, %', 'dummy'])
+                                                      'share, %', 'dummy'])
                     month_data = pd.concat([month_data, total_row.drop(columns=['dummy'])], ignore_index=True)
 
                     # Define display order
-                    display_columns = ['category', 'value', 'percentage, %', 'Δ, %']
+                    display_columns = ['year_month', 'category', 'value', 'share, %', 'Δ, %']
 
                     axs[i].axis('tight')
                     axs[i].axis('off')
