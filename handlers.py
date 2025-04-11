@@ -59,6 +59,7 @@ class Handlers:
             self.handle_single_category_selection,
             lambda m: self.user_data.get(m.from_user.id, {}).get('step') == 'single_category_selection'
         )
+        self.dp.register_message_handler(self.show_last_year_chart, lambda m: m.text == "Last year 🗓️")
         self.dp.register_message_handler(self.help_command, commands=['help'])
 
     async def start(self, message: types.Message):
@@ -433,6 +434,81 @@ class Handlers:
             await message.reply("❌ Failed to generate chart. Please try again later.", reply_markup=create_main_keyboard())
         finally:
             self.user_data[message.from_user.id] = {'step': 'payment_type'}
+
+    async def show_last_year_chart(self, message: types.Message):
+        """Show line chart of total expenses for the last 12 months."""
+        try:
+            if not self._is_authorized(message.from_user.id):
+                await self._handle_unauthorized(message)
+                return
+
+            data = self.db.get_all_rows()
+            if len(data) <= 1:  # Only header row
+                await message.reply("No data available for analytics.", reply_markup=create_main_keyboard())
+                return
+
+            df = pd.DataFrame(data[1:], columns=data[0])
+            df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce')
+            df['value'] = pd.to_numeric(df['value'], errors='coerce')
+            
+            # Get data for the last 12 months
+            current_date = datetime.datetime.now()
+            twelve_months_ago = current_date - pd.DateOffset(months=12)
+            filtered_df = df[df['date'] >= twelve_months_ago]
+
+            if filtered_df.empty:
+                await message.reply("No data available for the last 12 months.", reply_markup=create_main_keyboard())
+                return
+
+            # Create separate charts for each currency
+            for currency in ['RUB', 'RSD']:
+                currency_df = filtered_df[filtered_df['payment_type'] == currency]
+                if currency_df.empty:
+                    continue
+
+                # Group by month and sum values
+                monthly_data = currency_df.groupby(currency_df['date'].dt.to_period('M'))['value'].sum()
+                monthly_data.index = monthly_data.index.astype(str)
+
+                # Create the line chart
+                plt.figure(figsize=(12, 6))
+                plt.plot(monthly_data.index, monthly_data.values, marker='o', linestyle='-', linewidth=2)
+                
+                # Customize the plot
+                plt.title(f'📊 Total Expenses - Last 12 Months ({currency})', fontsize=14)
+                plt.xlabel('Month', fontsize=12)
+                plt.ylabel('Total Expenses', fontsize=12)
+                plt.xticks(rotation=45)
+                plt.grid(True, linestyle='--', alpha=0.7)
+                
+                # Add value labels on top of points
+                for i, v in enumerate(monthly_data.values):
+                    plt.text(i, v, f'{v:.0f}', ha='center', va='bottom', fontsize=10)
+                
+                plt.tight_layout()
+
+                # Save the chart to a buffer
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', bbox_inches='tight', dpi=300)
+                buffer.seek(0)
+                plt.close()
+
+                await self.bot.send_photo(
+                    chat_id=message.chat.id,
+                    photo=buffer,
+                    caption=f"📊 Total Expenses - Last 12 Months ({currency})"
+                )
+                buffer.close()
+
+            # Show analytics keyboard after sending charts
+            await message.reply(
+                "Choose analytics type:",
+                reply_markup=create_analytics_keyboard()
+            )
+            logger.info(f"User {message.from_user.id} requested last year chart")
+        except Exception as e:
+            logger.error(f"Error generating last year chart: {str(e)}")
+            await message.reply("❌ Failed to generate chart. Please try again later.", reply_markup=create_main_keyboard())
 
     async def help_command(self, message: types.Message):
         """Show help message."""
