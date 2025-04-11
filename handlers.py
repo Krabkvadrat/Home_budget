@@ -15,7 +15,6 @@ from utils import (
 
 logger = logging.getLogger(__name__)
 
-plt.style.use("cyberpunk")
 
 class Handlers:
     def __init__(self, bot, dp, db):
@@ -406,6 +405,8 @@ class Handlers:
                 # Group by month and sum values
                 monthly_data = category_df.groupby(category_df['date'].dt.to_period('M'))['value'].sum()
                 monthly_data.index = monthly_data.index.astype(str)
+                
+                plt.style.use("cyberpunk")
 
                 # Create the line chart
                 plt.figure(figsize=(10, 6))
@@ -472,6 +473,8 @@ class Handlers:
                 # Group by month and sum values
                 monthly_data = currency_df.groupby(currency_df['date'].dt.to_period('M'))['value'].sum()
                 monthly_data.index = monthly_data.index.astype(str)
+
+                plt.style.use("cyberpunk")
 
                 # Create the line chart
                 plt.figure(figsize=(12, 6))
