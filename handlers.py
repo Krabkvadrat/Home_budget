@@ -3,6 +3,7 @@ import datetime
 import io
 import pandas as pd
 import matplotlib.pyplot as plt
+import mplcyberpunk
 from aiogram import types
 from aiogram.types import ReplyKeyboardRemove
 from settings import CATEGORIES, AUTHORIZED_USERS
@@ -13,6 +14,8 @@ from utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+plt.style.use("cyberpunk")
 
 class Handlers:
     def __init__(self, bot, dp, db):
