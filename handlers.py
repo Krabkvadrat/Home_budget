@@ -417,7 +417,7 @@ class Handlers:
                 plt.xticks(rotation=45)
                 plt.grid(True)
                 plt.tight_layout()
-
+                mplcyberpunk.add_glow_effects()
                 # Save the chart to a buffer
                 buffer = io.BytesIO()
                 plt.savefig(buffer, format='png', bbox_inches='tight', dpi=300)
@@ -492,7 +492,7 @@ class Handlers:
                     plt.text(i, v, f'{v:.0f}', ha='center', va='bottom', fontsize=10)
                 
                 plt.tight_layout()
-
+                mplcyberpunk.add_glow_effects()
                 # Save the chart to a buffer
                 buffer = io.BytesIO()
                 plt.savefig(buffer, format='png', bbox_inches='tight', dpi=300)
