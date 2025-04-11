@@ -54,6 +54,11 @@ class Handlers:
         self.dp.register_message_handler(self.analytics_button, lambda m: m.text == "Show analytics 📊")
         self.dp.register_message_handler(self.back_button, lambda m: m.text == "Back 🔙")
         self.dp.register_message_handler(self.show_analytics_two_months, lambda m: m.text == "Two months 📅")
+        self.dp.register_message_handler(self.single_category_chart, lambda m: m.text == "Single category chart 📊")
+        self.dp.register_message_handler(
+            self.handle_single_category_selection,
+            lambda m: self.user_data.get(m.from_user.id, {}).get('step') == 'single_category_selection'
+        )
         self.dp.register_message_handler(self.help_command, commands=['help'])
 
     async def start(self, message: types.Message):
@@ -346,6 +351,88 @@ class Handlers:
         except Exception as e:
             logger.error(f"Error generating analytics: {str(e)}")
             await message.reply("❌ Failed to generate analytics. Please try again later.", reply_markup=create_main_keyboard())
+
+    async def single_category_chart(self, message: types.Message):
+        """Handle single category chart button press."""
+        try:
+            if not self._is_authorized(message.from_user.id):
+                await self._handle_unauthorized(message)
+                return
+
+            self.user_data[message.from_user.id] = {'step': 'single_category_selection'}
+            await message.reply("Choose a category to view its chart:", reply_markup=create_category_keyboard())
+        except Exception as e:
+            logger.error(f"Error in single category chart handler: {str(e)}")
+            await message.reply("❌ Failed to process request. Please try again later.", reply_markup=create_main_keyboard())
+
+    async def handle_single_category_selection(self, message: types.Message):
+        """Handle category selection for single category chart."""
+        try:
+            if message.text not in CATEGORIES:
+                logger.warning(f"User {message.from_user.id} selected invalid category: {message.text}")
+                await message.reply("Invalid category. Please choose a valid category.")
+                return
+
+            data = self.db.get_all_rows()
+            if len(data) <= 1:  # Only header row
+                await message.reply("No data available for analytics.", reply_markup=create_main_keyboard())
+                return
+
+            df = pd.DataFrame(data[1:], columns=data[0])
+            df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce')
+            df['value'] = pd.to_numeric(df['value'], errors='coerce')
+            
+            # Get data for the last 12 months
+            current_date = datetime.datetime.now()
+            twelve_months_ago = current_date - pd.DateOffset(months=12)
+            filtered_df = df[df['date'] >= twelve_months_ago]
+
+            if filtered_df.empty:
+                await message.reply("No data available for the last 12 months.", reply_markup=create_main_keyboard())
+                return
+
+            # Create separate charts for each currency
+            for currency in ['RUB', 'RSD']:
+                currency_df = filtered_df[filtered_df['payment_type'] == currency]
+                category_df = currency_df[currency_df['category'] == message.text]
+                
+                if category_df.empty:
+                    continue
+
+                # Group by month and sum values
+                monthly_data = category_df.groupby(category_df['date'].dt.to_period('M'))['value'].sum()
+                monthly_data.index = monthly_data.index.astype(str)
+
+                # Create the line chart
+                plt.figure(figsize=(10, 6))
+                plt.plot(monthly_data.index, monthly_data.values, marker='o', linestyle='-')
+                plt.title(f'📊 {message.text} Expenses - Last 12 Months ({currency})')
+                plt.xlabel('Month')
+                plt.ylabel('Amount')
+                plt.xticks(rotation=45)
+                plt.grid(True)
+                plt.tight_layout()
+
+                # Save the chart to a buffer
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', bbox_inches='tight', dpi=300)
+                buffer.seek(0)
+                plt.close()
+
+                await self.bot.send_photo(
+                    chat_id=message.chat.id,
+                    photo=buffer,
+                    caption=f"📊 {message.text} Expenses - Last 12 Months ({currency})"
+                )
+                buffer.close()
+
+            logger.info(f"User {message.from_user.id} requested single category chart for {message.text}")
+            await message.reply("Choose another action:", reply_markup=create_analytics_keyboard())
+        except Exception as e:
+            logger.error(f"Error generating single category chart: {str(e)}")
+            await message.reply("❌ Failed to generate chart. Please try again later.", reply_markup=create_main_keyboard())
+        finally:
+            self.user_data[message.from_user.id] = {'step': 'payment_type'}
 
     async def help_command(self, message: types.Message):
         """Show help message."""
