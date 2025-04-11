@@ -1,4 +1,5 @@
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 from aiogram import Bot, Dispatcher
 from aiogram.utils import executor
@@ -10,12 +11,20 @@ from handlers import Handlers
 LOG_DIR = "/app/logs"  # Docker-friendly path
 os.makedirs(LOG_DIR, exist_ok=True)  # Create logs directory if it doesn't exist
 
+# Create a rotating file handler for log rotation
+rotating_handler = RotatingFileHandler(
+    os.path.join(LOG_DIR, 'bot.log'),
+    maxBytes=50 * 1024 * 1024,  # 50 MB
+    backupCount=5  # Keep the last 5 log files as backups
+)
+
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(os.path.join(LOG_DIR, 'bot.log')),
-        logging.StreamHandler()
+        rotating_handler,  # Rotating log file handler
+        logging.StreamHandler()  # Console output
     ]
 )
 logger = logging.getLogger(__name__)

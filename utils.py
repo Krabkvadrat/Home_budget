@@ -37,6 +37,14 @@ def create_main_keyboard():
     keyboard.add(KeyboardButton("Delete last row 🗑️"))
     return keyboard
 
+def create_analytics_keyboard():
+    """Create the main keyboard with all available options."""
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.add(KeyboardButton("Two months 📅"), KeyboardButton("Last year 🗓️"))
+    keyboard.add(KeyboardButton("Single category chart 📊"))
+    keyboard.add(KeyboardButton("Back 🔙"))
+    return keyboard
+
 def create_category_keyboard():
     """Create keyboard with category buttons."""
     category_buttons = ReplyKeyboardMarkup(resize_keyboard=True)
