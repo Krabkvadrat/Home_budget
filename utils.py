@@ -1,6 +1,6 @@
 import logging
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from settings import CATEGORIES
+from settings import CATEGORIES, INCOME_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +32,23 @@ def validate_description(description: str) -> str:
 def create_main_keyboard():
     """Create the main keyboard with all available options."""
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-    keyboard.add(KeyboardButton("RUB 🇷🇺"), KeyboardButton("RSD 🇷🇸"))
+    keyboard.add(KeyboardButton("💸 Add Expense"), KeyboardButton("💰 Add Income"))
     keyboard.add(KeyboardButton("Show Last 3 Entries 📜"), KeyboardButton("Show analytics 📊"))
     keyboard.add(KeyboardButton("Delete last row 🗑️"))
+    return keyboard
+
+def create_expense_keyboard():
+    """Create keyboard for expense currency selection."""
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.add(KeyboardButton("RUB 🇷🇺"), KeyboardButton("RSD 🇷🇸"))
+    keyboard.add(KeyboardButton("Back to Main 🔙"))
+    return keyboard
+
+def create_income_keyboard():
+    """Create keyboard for income currency selection."""
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.add(KeyboardButton("RUB 🇷🇺"), KeyboardButton("RSD 🇷🇸"))
+    keyboard.add(KeyboardButton("Back to Main 🔙"))
     return keyboard
 
 def create_analytics_keyboard():
@@ -58,6 +72,19 @@ def create_category_keyboard():
         category_buttons.add(*row)
     return category_buttons
 
+def create_income_type_keyboard():
+    """Create keyboard with income type buttons."""
+    income_type_buttons = ReplyKeyboardMarkup(resize_keyboard=True)
+    row = []
+    for income_type in INCOME_TYPES:
+        row.append(KeyboardButton(income_type))
+        if len(row) == 2:
+            income_type_buttons.add(*row)
+            row = []
+    if row:
+        income_type_buttons.add(*row)
+    return income_type_buttons
+
 def create_confirmation_keyboard():
     """Create keyboard with Yes/No buttons."""
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
@@ -71,6 +98,18 @@ def format_expense_entry(row):
         f"💰 Value: {row[1]}\n"
         f"📝 Description: {row[2]}\n"
         f"🏷️ Category: {row[3]}\n"
+        f"💳 Payment Type: {row[4]}\n"
+        f"📅 Year/Month: {row[5]}\n"
+        f"👤 User: {row[6]}"
+    )
+
+def format_income_entry(row):
+    """Format a single income entry for display."""
+    return (
+        f"📅 Date: {row[0]}\n"
+        f"💰 Value: {row[1]}\n"
+        f"📝 Description: {row[2]}\n"
+        f"🏷️ Type: {row[3]}\n"
         f"💳 Payment Type: {row[4]}\n"
         f"📅 Year/Month: {row[5]}\n"
         f"👤 User: {row[6]}"
