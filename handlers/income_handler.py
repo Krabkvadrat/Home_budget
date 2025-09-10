@@ -6,7 +6,7 @@ from settings import INCOME_TYPES
 from utils import (
     validate_value, validate_description, ValidationError,
     create_main_keyboard, create_income_type_keyboard, create_confirmation_keyboard,
-    format_income_entry, create_income_keyboard
+    format_income_entry, create_income_menu_keyboard
 )
 from .base_handler import BaseHandler
 
@@ -15,9 +15,8 @@ logger = logging.getLogger(__name__)
 class IncomeHandler(BaseHandler):
     def _register_handlers(self):
         """Register income-related message handlers."""
-        self.dp.register_message_handler(self.handle_add_income, lambda m: m.text == "💰 Add Income")
-        self.dp.register_message_handler(self.handle_income_payment_type, 
-                                       lambda m: self.user_data.get(m.from_user.id, {}).get('step') == 'income_payment_type' and m.text in ["RUB 🇷🇺", "RSD 🇷🇸"])
+        self.dp.register_message_handler(self.handle_income_currency_selection, 
+                                       lambda m: self.user_data.get(m.from_user.id, {}).get('in_income_menu') == True and m.text in ["RUB 🇷🇺", "RSD 🇷🇸"])
         self.dp.register_message_handler(self.handle_income_value, 
                                        lambda m: self.user_data.get(m.from_user.id, {}).get('step') == 'income_value')
         self.dp.register_message_handler(self.handle_income_description, 
@@ -36,36 +35,26 @@ class IncomeHandler(BaseHandler):
         )
         self.dp.register_message_handler(self.handle_back_to_main, lambda m: m.text == "Back to Main 🔙")
 
-    async def handle_add_income(self, message: types.Message):
-        """Handle add income button press."""
+    async def handle_income_currency_selection(self, message: types.Message):
+        """Handle income currency selection from income menu."""
         try:
             if not self._is_authorized(message.from_user.id):
                 await self._handle_unauthorized(message)
                 return
 
-            self.user_data[message.from_user.id] = {'step': 'income_payment_type'}
-            await message.reply("💰 Great! Let's add your income. Please choose the currency:", 
-                              reply_markup=create_income_keyboard())
-        except Exception as e:
-            logger.error(f"Error in add income handler: {str(e)}")
-            await message.reply("❌ Failed to start income entry. Please try again later.", 
-                              reply_markup=create_main_keyboard())
-
-    async def handle_income_payment_type(self, message: types.Message):
-        """Handle income payment type selection."""
-        try:
             payment_type = "RUB" if "RUB" in message.text else "RSD"
             self.user_data[message.from_user.id]['payment_type'] = payment_type
             self.user_data[message.from_user.id]['step'] = 'income_value'
+            self.user_data[message.from_user.id]['in_income_menu'] = False  # Clear the flag during the process
             
             await message.reply(
                 f"💰 You selected {payment_type}. Now enter the income amount:",
                 reply_markup=ReplyKeyboardRemove()
             )
         except Exception as e:
-            logger.error(f"Error in income payment type handler: {str(e)}")
-            await message.reply("❌ Failed to process payment type. Please try again.", 
-                              reply_markup=create_main_keyboard())
+            logger.error(f"Error in income currency selection handler: {str(e)}")
+            await message.reply("❌ Failed to process currency selection. Please try again.", 
+                              reply_markup=create_income_menu_keyboard())
 
     async def handle_income_value(self, message: types.Message):
         """Handle income value input."""
@@ -158,21 +147,21 @@ class IncomeHandler(BaseHandler):
                     await message.reply(
                         f"✅ Income entry saved successfully!\n"
                         f"💰 {user_data['value']} {user_data['payment_type']} - {user_data['description']}",
-                        reply_markup=create_main_keyboard()
+                        reply_markup=create_income_menu_keyboard()
                     )
                     logger.info(f"User {message.from_user.id} added income: {user_data['value']} {user_data['payment_type']}")
                 else:
                     await message.reply("❌ Failed to save income entry. Please try again.", 
-                                      reply_markup=create_main_keyboard())
+                                      reply_markup=create_income_menu_keyboard())
             else:
-                await message.reply("❌ Income entry cancelled.", reply_markup=create_main_keyboard())
+                await message.reply("❌ Income entry cancelled.", reply_markup=create_income_menu_keyboard())
             
-            # Reset user data
-            self.user_data[message.from_user.id] = {'step': 'payment_type'}
+            # Reset user data back to income menu
+            self.user_data[message.from_user.id] = {'in_income_menu': True}
         except Exception as e:
             logger.error(f"Error in income confirmation handler: {str(e)}")
             await message.reply("❌ Failed to process confirmation. Please try again.", 
-                              reply_markup=create_main_keyboard())
+                              reply_markup=create_income_menu_keyboard())
 
     async def show_last_three_income_entries(self, message: types.Message):
         """Show last 3 income entries."""
@@ -183,7 +172,7 @@ class IncomeHandler(BaseHandler):
 
             data = self.db.get_all_income_rows()
             if len(data) <= 1:  # Only header row
-                await message.reply("💰 No income entries found.", reply_markup=create_main_keyboard())
+                await message.reply("💰 No income entries found.", reply_markup=create_income_menu_keyboard())
                 return
 
             last_entries = data[-3:]  # Get last 3 entries
@@ -192,12 +181,12 @@ class IncomeHandler(BaseHandler):
             for i, entry in enumerate(reversed(last_entries), 1):
                 response += f"**Entry {i}:**\n{format_income_entry(entry)}\n\n"
             
-            await message.reply(response, reply_markup=create_main_keyboard())
+            await message.reply(response, reply_markup=create_income_menu_keyboard())
             logger.info(f"User {message.from_user.id} requested last 3 income entries")
         except Exception as e:
             logger.error(f"Error showing last income entries: {str(e)}")
             await message.reply("❌ Failed to retrieve income entries. Please try again later.", 
-                              reply_markup=create_main_keyboard())
+                              reply_markup=create_income_menu_keyboard())
 
     async def delete_last_income_row_confirm(self, message: types.Message):
         """Confirm deletion of last income row."""
@@ -208,7 +197,7 @@ class IncomeHandler(BaseHandler):
 
             data = self.db.get_all_income_rows()
             if len(data) <= 1:  # Only header row
-                await message.reply("💰 No income entries to delete.", reply_markup=create_main_keyboard())
+                await message.reply("💰 No income entries to delete.", reply_markup=create_income_menu_keyboard())
                 return
 
             last_entry = data[-1]
@@ -224,7 +213,7 @@ class IncomeHandler(BaseHandler):
         except Exception as e:
             logger.error(f"Error in delete income confirmation: {str(e)}")
             await message.reply("❌ Failed to process deletion request. Please try again later.", 
-                              reply_markup=create_main_keyboard())
+                              reply_markup=create_income_menu_keyboard())
 
     async def handle_income_delete_confirmation(self, message: types.Message):
         """Handle income deletion confirmation."""
@@ -235,23 +224,23 @@ class IncomeHandler(BaseHandler):
                     last_row_index = len(data)
                     if self.db.delete_income_row(last_row_index):
                         await message.reply("✅ Last income entry deleted successfully!", 
-                                          reply_markup=create_main_keyboard())
+                                          reply_markup=create_income_menu_keyboard())
                         logger.info(f"User {message.from_user.id} deleted last income entry")
                     else:
                         await message.reply("❌ Failed to delete income entry. Please try again later.", 
-                                          reply_markup=create_main_keyboard())
+                                          reply_markup=create_income_menu_keyboard())
                 else:
                     await message.reply("💰 No income entries to delete.", 
-                                      reply_markup=create_main_keyboard())
+                                      reply_markup=create_income_menu_keyboard())
             else:
-                await message.reply("❌ Deletion cancelled.", reply_markup=create_main_keyboard())
+                await message.reply("❌ Deletion cancelled.", reply_markup=create_income_menu_keyboard())
             
-            # Reset user data
-            self.user_data[message.from_user.id] = {'step': 'payment_type'}
+            # Reset user data back to income menu
+            self.user_data[message.from_user.id] = {'in_income_menu': True}
         except Exception as e:
             logger.error(f"Error in income delete confirmation handler: {str(e)}")
             await message.reply("❌ Failed to process deletion. Please try again.", 
-                              reply_markup=create_main_keyboard())
+                              reply_markup=create_income_menu_keyboard())
 
     async def handle_back_to_main(self, message: types.Message):
         """Handle back to main menu."""

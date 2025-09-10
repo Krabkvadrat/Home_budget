@@ -32,22 +32,18 @@ def validate_description(description: str) -> str:
 def create_main_keyboard():
     """Create the main keyboard with all available options."""
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-    keyboard.add(KeyboardButton("💸 Add Expense"), KeyboardButton("💰 Add Income"))
+    keyboard.add(KeyboardButton("RUB 🇷🇺"), KeyboardButton("RSD 🇷🇸"))
     keyboard.add(KeyboardButton("Show Last 3 Entries 📜"), KeyboardButton("Show analytics 📊"))
     keyboard.add(KeyboardButton("Delete last row 🗑️"))
+    keyboard.add(KeyboardButton("Income menu 💰"))
     return keyboard
 
-def create_expense_keyboard():
-    """Create keyboard for expense currency selection."""
+def create_income_menu_keyboard():
+    """Create the income menu keyboard."""
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
     keyboard.add(KeyboardButton("RUB 🇷🇺"), KeyboardButton("RSD 🇷🇸"))
-    keyboard.add(KeyboardButton("Back to Main 🔙"))
-    return keyboard
-
-def create_income_keyboard():
-    """Create keyboard for income currency selection."""
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-    keyboard.add(KeyboardButton("RUB 🇷🇺"), KeyboardButton("RSD 🇷🇸"))
+    keyboard.add(KeyboardButton("Show Last 3 Income Entries 📜"))
+    keyboard.add(KeyboardButton("Delete last income row 🗑️"))
     keyboard.add(KeyboardButton("Back to Main 🔙"))
     return keyboard
 

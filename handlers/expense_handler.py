@@ -6,7 +6,7 @@ from settings import CATEGORIES
 from utils import (
     validate_value, validate_description, ValidationError,
     create_main_keyboard, create_category_keyboard, create_confirmation_keyboard,
-    format_expense_entry, create_expense_keyboard
+    format_expense_entry, create_income_menu_keyboard
 )
 from .base_handler import BaseHandler
 
@@ -16,9 +16,7 @@ class ExpenseHandler(BaseHandler):
     def _register_handlers(self):
         """Register expense-related message handlers."""
         self.dp.register_message_handler(self.start, commands=['start'])
-        self.dp.register_message_handler(self.handle_add_expense, lambda m: m.text == "💸 Add Expense")
-        self.dp.register_message_handler(self.handle_payment_type, 
-                                       lambda m: self.user_data.get(m.from_user.id, {}).get('step') == 'expense_payment_type' and m.text in ["RUB 🇷🇺", "RSD 🇷🇸"])
+        self.dp.register_message_handler(self.handle_payment_type, lambda m: m.text in ["RUB 🇷🇺", "RSD 🇷🇸"])
         self.dp.register_message_handler(self.handle_value, lambda m: self.user_data.get(m.from_user.id, {}).get('step') == 'value')
         self.dp.register_message_handler(self.handle_description, lambda m: self.user_data.get(m.from_user.id, {}).get('step') == 'description')
         self.dp.register_message_handler(self.handle_category, lambda m: self.user_data.get(m.from_user.id, {}).get('step') == 'category')
@@ -32,7 +30,7 @@ class ExpenseHandler(BaseHandler):
             self.handle_delete_confirmation,
             lambda m: self.user_data.get(m.from_user.id, {}).get('step') == 'delete_confirmation'
         )
-        self.dp.register_message_handler(self.handle_back_to_main, lambda m: m.text == "Back to Main 🔙")
+        self.dp.register_message_handler(self.handle_income_menu, lambda m: m.text == "Income menu 💰")
         self.dp.register_message_handler(self.help_command, commands=['help'])
 
     async def start(self, message: types.Message):
@@ -49,21 +47,6 @@ class ExpenseHandler(BaseHandler):
             logger.error(f"Error in start handler: {str(e)}")
             await message.reply("Sorry, something went wrong. Please try again later.")
 
-    async def handle_add_expense(self, message: types.Message):
-        """Handle add expense button press."""
-        try:
-            if not self._is_authorized(message.from_user.id):
-                await self._handle_unauthorized(message)
-                return
-
-            self.user_data[message.from_user.id] = {'step': 'expense_payment_type'}
-            await message.reply("💸 Great! Let's add your expense. Please choose the currency:", 
-                              reply_markup=create_expense_keyboard())
-        except Exception as e:
-            logger.error(f"Error in add expense handler: {str(e)}")
-            await message.reply("❌ Failed to start expense entry. Please try again later.", 
-                              reply_markup=create_main_keyboard())
-
     async def handle_payment_type(self, message: types.Message):
         """Handle payment type selection."""
         try:
@@ -72,12 +55,14 @@ class ExpenseHandler(BaseHandler):
                 return
 
             payment_type = "RUB" if "RUB" in message.text else "RSD"
-            self.user_data[message.from_user.id]['payment_type'] = payment_type
-            self.user_data[message.from_user.id]['date'] = datetime.datetime.now().strftime("%Y-%m-%d")
-            self.user_data[message.from_user.id]['year_month'] = datetime.datetime.now().strftime("%Y-%m")
-            self.user_data[message.from_user.id]['step'] = 'value'
+            self.user_data[message.from_user.id] = {
+                'payment_type': payment_type,
+                'date': datetime.datetime.now().strftime("%Y-%m-%d"),
+                'year_month': datetime.datetime.now().strftime("%Y-%m"),
+                'step': 'value'
+            }
             logger.info(f"Authorized user {message.from_user.id} selected payment type: {payment_type}")
-            await message.reply(f"💸 You selected {payment_type}. Now enter the expense amount:", 
+            await message.reply(f"You selected {payment_type}. Now enter the expense amount:", 
                               reply_markup=ReplyKeyboardRemove())
         except KeyError:
             logger.warning(f"User {message.from_user.id} tried to use payment type without starting the bot")
@@ -233,14 +218,21 @@ class ExpenseHandler(BaseHandler):
         finally:
             self.user_data[message.from_user.id] = {'step': 'payment_type'}
 
-    async def handle_back_to_main(self, message: types.Message):
-        """Handle back to main menu."""
+    async def handle_income_menu(self, message: types.Message):
+        """Handle income menu button press."""
         try:
-            self.user_data[message.from_user.id] = {'step': 'payment_type'}
-            await message.reply("🏠 Back to main menu:", reply_markup=create_main_keyboard())
+            if not self._is_authorized(message.from_user.id):
+                await self._handle_unauthorized(message)
+                return
+
+            # Set flag to indicate user is in income menu
+            self.user_data[message.from_user.id] = {'in_income_menu': True}
+            await message.reply("💰 Income Menu - Choose an option:", 
+                              reply_markup=create_income_menu_keyboard())
         except Exception as e:
-            logger.error(f"Error in back to main handler: {str(e)}")
-            await message.reply("❌ Failed to go back. Please try again.", reply_markup=create_main_keyboard())
+            logger.error(f"Error in income menu handler: {str(e)}")
+            await message.reply("❌ Failed to open income menu. Please try again.", 
+                              reply_markup=create_main_keyboard())
 
     async def help_command(self, message: types.Message):
         """Show help message."""
