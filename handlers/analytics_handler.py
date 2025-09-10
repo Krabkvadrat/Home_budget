@@ -3,7 +3,6 @@ import datetime
 import io
 import pandas as pd
 import matplotlib.pyplot as plt
-import mplcyberpunk
 from aiogram import types
 from settings import CATEGORIES
 from utils import create_analytics_keyboard, create_category_keyboard, create_main_keyboard
@@ -183,18 +182,21 @@ class AnalyticsHandler(BaseHandler):
                 monthly_data = category_df.groupby(category_df['date'].dt.to_period('M'))['value'].sum()
                 monthly_data.index = monthly_data.index.astype(str)
                 
-                plt.style.use("cyberpunk")
+                plt.style.use("dark_background")
 
                 # Create the line chart
                 plt.figure(figsize=(10, 6))
-                plt.plot(monthly_data.index, monthly_data.values, marker='o', linestyle='-')
-                plt.title(f'📊 {message.text} Expenses - Last 12 Months ({currency})')
-                plt.xlabel('Month')
-                plt.ylabel('Amount')
-                plt.xticks(rotation=45)
-                plt.grid(True)
+                plt.plot(monthly_data.index, monthly_data.values, marker='o', linestyle='-', 
+                        linewidth=2.5, markersize=8, color='#00ffff', markerfacecolor='#00ffff', 
+                        markeredgecolor='white', markeredgewidth=1.5)
+                plt.title(f'📊 {message.text} Expenses - Last 12 Months ({currency})', 
+                         fontsize=14, color='white', fontweight='bold')
+                plt.xlabel('Month', fontsize=12, color='white')
+                plt.ylabel('Amount', fontsize=12, color='white')
+                plt.xticks(rotation=45, color='white')
+                plt.yticks(color='white')
+                plt.grid(True, alpha=0.3, color='white')
                 plt.tight_layout()
-                mplcyberpunk.add_glow_effects()
                 # Save the chart to a buffer
                 buffer = io.BytesIO()
                 plt.savefig(buffer, format='png', bbox_inches='tight', dpi=300)
@@ -251,25 +253,28 @@ class AnalyticsHandler(BaseHandler):
                 monthly_data = currency_df.groupby(currency_df['date'].dt.to_period('M'))['value'].sum()
                 monthly_data.index = monthly_data.index.astype(str)
 
-                plt.style.use("cyberpunk")
+                plt.style.use("dark_background")
 
                 # Create the line chart
                 plt.figure(figsize=(12, 6))
-                plt.plot(monthly_data.index, monthly_data.values, marker='o', linestyle='-', linewidth=2)
+                plt.plot(monthly_data.index, monthly_data.values, marker='o', linestyle='-', 
+                        linewidth=2.5, markersize=8, color='#00ffff', markerfacecolor='#00ffff', 
+                        markeredgecolor='white', markeredgewidth=1.5)
                 
                 # Customize the plot
-                plt.title(f'📊 Total Expenses - Last 12 Months ({currency})', fontsize=14)
-                plt.xlabel('Month', fontsize=12)
-                plt.ylabel('Total Expenses', fontsize=12)
-                plt.xticks(rotation=45)
-                plt.grid(True, linestyle='--', alpha=0.7)
+                plt.title(f'📊 Total Expenses - Last 12 Months ({currency})', 
+                         fontsize=14, color='white', fontweight='bold')
+                plt.xlabel('Month', fontsize=12, color='white')
+                plt.ylabel('Total Expenses', fontsize=12, color='white')
+                plt.xticks(rotation=45, color='white')
+                plt.yticks(color='white')
+                plt.grid(True, linestyle='--', alpha=0.3, color='white')
                 
                 # Add value labels on top of points
                 for i, v in enumerate(monthly_data.values):
-                    plt.text(i, v, f'{v:.0f}', ha='center', va='bottom', fontsize=10)
+                    plt.text(i, v, f'{v:.0f}', ha='center', va='bottom', fontsize=10, color='white')
                 
                 plt.tight_layout()
-                mplcyberpunk.add_glow_effects()
                 # Save the chart to a buffer
                 buffer = io.BytesIO()
                 plt.savefig(buffer, format='png', bbox_inches='tight', dpi=300)
