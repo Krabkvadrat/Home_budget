@@ -41,7 +41,7 @@ def create_main_keyboard():
 def create_income_menu_keyboard():
     """Create the income menu keyboard."""
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-    keyboard.add(KeyboardButton("RUB 🇷🇺"), KeyboardButton("RSD 🇷🇸"))
+    keyboard.add(KeyboardButton("Income RUB 🇷🇺"), KeyboardButton("Income RSD 🇷🇸"))
     keyboard.add(KeyboardButton("Show Last 3 Income Entries 📜"))
     keyboard.add(KeyboardButton("Delete last income row 🗑️"))
     keyboard.add(KeyboardButton("Back to Main 🔙"))

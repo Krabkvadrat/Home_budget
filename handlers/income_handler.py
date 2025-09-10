@@ -16,7 +16,7 @@ class IncomeHandler(BaseHandler):
     def _register_handlers(self):
         """Register income-related message handlers."""
         self.dp.register_message_handler(self.handle_income_currency_selection, 
-                                       lambda m: self.user_data.get(m.from_user.id, {}).get('in_income_menu') == True and m.text in ["RUB 🇷🇺", "RSD 🇷🇸"])
+                                       lambda m: m.text in ["Income RUB 🇷🇺", "Income RSD 🇷🇸"])
         self.dp.register_message_handler(self.handle_income_value, 
                                        lambda m: self.user_data.get(m.from_user.id, {}).get('step') == 'income_value')
         self.dp.register_message_handler(self.handle_income_description, 
@@ -43,9 +43,10 @@ class IncomeHandler(BaseHandler):
                 return
 
             payment_type = "RUB" if "RUB" in message.text else "RSD"
-            self.user_data[message.from_user.id]['payment_type'] = payment_type
-            self.user_data[message.from_user.id]['step'] = 'income_value'
-            self.user_data[message.from_user.id]['in_income_menu'] = False  # Clear the flag during the process
+            self.user_data[message.from_user.id] = {
+                'payment_type': payment_type,
+                'step': 'income_value'
+            }
             
             await message.reply(
                 f"💰 You selected {payment_type}. Now enter the income amount:",
@@ -156,8 +157,8 @@ class IncomeHandler(BaseHandler):
             else:
                 await message.reply("❌ Income entry cancelled.", reply_markup=create_income_menu_keyboard())
             
-            # Reset user data back to income menu
-            self.user_data[message.from_user.id] = {'in_income_menu': True}
+            # Reset user data
+            self.user_data[message.from_user.id] = {}
         except Exception as e:
             logger.error(f"Error in income confirmation handler: {str(e)}")
             await message.reply("❌ Failed to process confirmation. Please try again.", 
@@ -235,8 +236,8 @@ class IncomeHandler(BaseHandler):
             else:
                 await message.reply("❌ Deletion cancelled.", reply_markup=create_income_menu_keyboard())
             
-            # Reset user data back to income menu
-            self.user_data[message.from_user.id] = {'in_income_menu': True}
+            # Reset user data
+            self.user_data[message.from_user.id] = {}
         except Exception as e:
             logger.error(f"Error in income delete confirmation handler: {str(e)}")
             await message.reply("❌ Failed to process deletion. Please try again.", 

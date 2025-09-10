@@ -16,8 +16,7 @@ class ExpenseHandler(BaseHandler):
     def _register_handlers(self):
         """Register expense-related message handlers."""
         self.dp.register_message_handler(self.start, commands=['start'])
-        self.dp.register_message_handler(self.handle_payment_type, 
-                                       lambda m: m.text in ["RUB 🇷🇺", "RSD 🇷🇸"] and not self.user_data.get(m.from_user.id, {}).get('in_income_menu', False))
+        self.dp.register_message_handler(self.handle_payment_type, lambda m: m.text in ["RUB 🇷🇺", "RSD 🇷🇸"])
         self.dp.register_message_handler(self.handle_value, lambda m: self.user_data.get(m.from_user.id, {}).get('step') == 'value')
         self.dp.register_message_handler(self.handle_description, lambda m: self.user_data.get(m.from_user.id, {}).get('step') == 'description')
         self.dp.register_message_handler(self.handle_category, lambda m: self.user_data.get(m.from_user.id, {}).get('step') == 'category')
@@ -226,8 +225,8 @@ class ExpenseHandler(BaseHandler):
                 await self._handle_unauthorized(message)
                 return
 
-            # Set flag to indicate user is in income menu
-            self.user_data[message.from_user.id] = {'in_income_menu': True}
+            # Reset user data for income menu
+            self.user_data[message.from_user.id] = {}
             await message.reply("💰 Income Menu - Choose an option:", 
                               reply_markup=create_income_menu_keyboard())
         except Exception as e:
