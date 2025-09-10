@@ -16,7 +16,8 @@ class ExpenseHandler(BaseHandler):
     def _register_handlers(self):
         """Register expense-related message handlers."""
         self.dp.register_message_handler(self.start, commands=['start'])
-        self.dp.register_message_handler(self.handle_payment_type, lambda m: m.text in ["RUB 🇷🇺", "RSD 🇷🇸"])
+        self.dp.register_message_handler(self.handle_payment_type, 
+                                       lambda m: m.text in ["RUB 🇷🇺", "RSD 🇷🇸"] and not self.user_data.get(m.from_user.id, {}).get('in_income_menu', False))
         self.dp.register_message_handler(self.handle_value, lambda m: self.user_data.get(m.from_user.id, {}).get('step') == 'value')
         self.dp.register_message_handler(self.handle_description, lambda m: self.user_data.get(m.from_user.id, {}).get('step') == 'description')
         self.dp.register_message_handler(self.handle_category, lambda m: self.user_data.get(m.from_user.id, {}).get('step') == 'category')
